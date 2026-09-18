@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install FFmpeg and fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+
+      - name: Unit tests
+        run: pytest -q
+
+      - name: Compile
+        run: python -m compileall -q app
+
+      - name: Offline render smoke test
+        run: |
+          mkdir -p /tmp/ig-charity-smoke
+          ffmpeg -y -f lavfi -i "sine=frequency=220:duration=14" /tmp/ig-charity-smoke/music.wav >/dev/null 2>&1
+          python - <<'PY'
+          from pathlib import Path
+          from app.content import ReelCopy
+          from app.music import MusicTrack
+          from app.render import render_reel
+
+          result = render_reel(
+              copy=ReelCopy(
+                  hook="please stop scrolling for a few seconds.",
+                  body="This is an offline CI render used only to verify the media pipeline.",
+                  cta="link in bio.",
+                  caption="smoke test",
+                  mood="calm",
+                  signature="ci",
+              ),
+              music=MusicTrack(
+                  id="ci",
+                  path=Path("/tmp/ig-charity-smoke/music.wav"),
+                  mood="calm",
+                  source_page="local",
+                  license="test",
+              ),
+              slot_id="ci-smoke-1",
+              duration_seconds=12,
+              out_dir=Path("/tmp/ig-charity-smoke/output"),
+          )
+          assert result.video.exists()
+          assert result.video.stat().st_size > 150_000
+          print(result.video)
+          PY
