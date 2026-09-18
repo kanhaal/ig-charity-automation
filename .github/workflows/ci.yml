@@ -42,6 +42,8 @@ jobs:
           from app.music import MusicTrack
           from app.render import render_reel
 
+          # Intentionally omit font_cache_dir. This is a regression test for the
+          # failure that previously reached CI when the renderer signature changed.
           result = render_reel(
               copy=ReelCopy(
                   hook="if you can spare 10 seconds, please read this.",
@@ -61,7 +63,6 @@ jobs:
               slot_id="ci-smoke-1",
               duration_seconds=12,
               out_dir=Path("/tmp/ig-charity-smoke/output"),
-              font_cache_dir=Path("/tmp/ig-charity-smoke/fonts"),
           )
           assert result.video.exists()
           assert result.video.stat().st_size > 150_000
