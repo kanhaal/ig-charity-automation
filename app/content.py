@@ -16,52 +16,51 @@ class ReelCopy:
 
 
 HOOKS = [
-    "please stop scrolling for a few seconds.",
+    "please stop scrolling for 10 seconds.",
     "if you can spare 10 seconds, please read this.",
-    "I almost didn't post this, but I need to try.",
-    "this is difficult to write, but I don't know what else to do.",
-    "one share could put this in front of the right person.",
-    "I know everyone has their own problems, but please hear me out.",
-    "I'm trying to keep going without giving up on my studies.",
-    "I don't expect everyone to donate. I just hope someone reads this.",
     "please read this before you scroll away.",
-    "I'm asking for a little understanding, not a miracle.",
-    "some days everything feels too heavy, but I'm still trying.",
+    "I know everyone has problems, but please hear me out.",
     "I never thought I'd make a page like this.",
+    "this is difficult to write, but I need to try.",
+    "I don't expect everyone to donate. Please just read this.",
+    "even one share could help this reach the right person.",
+    "some days everything feels too heavy, but I'm still trying.",
+    "I'm asking for a little understanding, not a miracle.",
+    "if this reaches the right person, it could genuinely help.",
+    "I almost didn't post this, but I don't know what else to do.",
 ]
 
 RECIPES = [
-    ("vulnerable", ["student", "finances", "education"]),
-    ("sad", ["student", "mother_health", "education"]),
+    ("sad", ["student", "finances", "education"]),
+    ("vulnerable", ["student", "mother_health", "education"]),
     ("reflective", ["finances", "father", "intent"]),
-    ("vulnerable", ["wellbeing", "student", "education"]),
+    ("vulnerable", ["wellbeing", "education", "intent"]),
     ("sad", ["mother_health", "finances", "intent"]),
+    ("calm", ["student", "education", "intent"]),
+    ("hopeful", ["education", "student", "intent"]),
     ("reflective", ["student", "father", "education"]),
-    ("calm", ["student", "intent", "education"]),
-    ("hopeful", ["education", "intent", "student"]),
 ]
 
 BRIDGES = [
-    "Right now, I'm trying to handle all of this while still showing up for school.",
-    "I'm doing my best to stay focused, even when home and studies both feel overwhelming.",
-    "I don't have a perfect solution; I'm just trying to keep moving forward one day at a time.",
-    "I know a post can't explain everything, but this is the reality I'm trying to manage right now.",
-    "I'm still trying to protect my education and be useful to my family at the same time.",
+    "I'm trying to keep showing up for my studies even when things at home feel overwhelming.",
+    "I don't have a perfect way to explain everything, but this is what life feels like right now.",
+    "I'm doing my best to stay focused even when family stress keeps following me into my studies.",
+    "I'm trying to protect my future through education while also carrying everything happening at home.",
+    "This page is my attempt to keep going without pretending everything is fine.",
 ]
 
 CTA_TEMPLATES = [
-    "If you're able to help, even a small amount would mean a lot. The Razorpay link is in my bio. If donating isn't possible, a share still helps.",
-    "If you want to support me, the Razorpay link is in my bio. Even sharing this page can help it reach someone who is able to donate.",
     "If you can help in any small way, the Razorpay link is in my bio. If you can't donate, please consider sharing this instead.",
-    "Any support is appreciated, but there is no pressure to donate. The Razorpay link is in my bio, and sharing the page helps too.",
-    "If you're in a position to help, the Razorpay link is in my bio. A donation or even a simple share can make a difference to this page.",
+    "If you're able to help, even a small amount would mean a lot. The Razorpay link is in my bio. Sharing also helps.",
+    "If you want to support me, the Razorpay link is in my bio. Even one share can help this reach someone who can donate.",
+    "If you're in a position to help, the Razorpay link is in my bio. If not, sharing this page still helps a lot.",
 ]
 
 CAPTION_OPENERS = [
     "Thank you for taking the time to read this.",
     "I'm trying to keep this page honest and simple.",
+    "Posting this isn't easy, but staying silent isn't helping either.",
     "I don't expect help from everyone who sees this.",
-    "Posting this is uncomfortable, but staying silent isn't helping either.",
     "Every share gives this page another chance to reach someone who can help.",
 ]
 
@@ -71,13 +70,30 @@ def _rng(slot_id: str) -> random.Random:
     return random.Random(seed)
 
 
-def build_copy(profile_cfg: dict, slot_id: str, recent_signatures: list[str]) -> ReelCopy:
+def _compose_body(
+    facts: dict,
+    recipe_keys: list[str],
+    rng: random.Random,
+) -> str:
+    selected = [facts[key] for key in recipe_keys]
+    bridge = rng.choice(BRIDGES)
+
+    # Keep the on-screen copy readable. The full story remains available in the
+    # caption, while the Reel uses only three fact statements plus one bridge.
+    return " ".join([selected[0], bridge, selected[1], selected[2]])
+
+
+def build_copy(
+    profile_cfg: dict,
+    slot_id: str,
+    recent_signatures: list[str],
+) -> ReelCopy:
     facts = profile_cfg["approved_facts"]
     cta_cfg = profile_cfg["cta"]
     hashtags = " ".join(f"#{tag}" for tag in profile_cfg.get("hashtags", []))
     rng = _rng(slot_id)
 
-    combinations = []
+    combinations: list[tuple[int, int]] = []
     for hook_idx in range(len(HOOKS)):
         for recipe_idx in range(len(RECIPES)):
             combinations.append((hook_idx, recipe_idx))
@@ -92,11 +108,8 @@ def build_copy(profile_cfg: dict, slot_id: str, recent_signatures: list[str]) ->
             break
 
     hook_idx, recipe_idx = chosen
-    mood, fact_ids = RECIPES[recipe_idx]
-    selected = [facts[key] for key in fact_ids]
-    bridge = rng.choice(BRIDGES)
-    body = " ".join([selected[0], bridge, *selected[1:]])
-
+    mood, recipe_keys = RECIPES[recipe_idx]
+    body = _compose_body(facts, recipe_keys, rng)
     cta = rng.choice(CTA_TEMPLATES)
 
     caption = (
