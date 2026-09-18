@@ -1,4 +1,5 @@
-# Music is downloaded automatically from Wikimedia Commons and cached by GitHub Actions.
+# Copyright-safe emotional music only. Tracks are downloaded automatically
+# from Wikimedia Commons and cached by GitHub Actions.
 tracks:
   - id: komiku_sad_piano
     filename: "Komiku - 32 - Sad walk with sad piano.ogg"
@@ -11,6 +12,18 @@ tracks:
     moods: [sad, reflective]
     license: CC0-1.0
     source_page: "https://commons.wikimedia.org/wiki/File:Komiku_-_14_-_Sad_walk_with_sad_melodica.ogg"
+
+  - id: emotional_piano
+    filename: "Emotional piano.wav"
+    moods: [sad, vulnerable, reflective]
+    license: CC0-1.0
+    source_page: "https://commons.wikimedia.org/wiki/File:Emotional_piano.wav"
+
+  - id: melancholic_ending
+    filename: "Soft and Furious - 10 - Melancholic Ending.ogg"
+    moods: [sad, vulnerable, reflective]
+    license: CC0-1.0
+    source_page: "https://commons.wikimedia.org/wiki/File:Soft_and_Furious_-_10_-_Melancholic_Ending.ogg"
 
   - id: frederic_stay_calm
     filename: "Frederic Lardon - 04 - Stay Calm.ogg"
