@@ -89,7 +89,9 @@ After those two secrets are set, the scheduled workflow handles generation, musi
 
 The CI workflow performs an offline render test automatically on every push.
 
-For an end-to-end live test, use **Actions → Publish Instagram reels → Run workflow** only after both secrets are present and the facts in `config/profile.yml` have been checked. If a normal slot is already due, that dispatch can publish it.
+For a no-post preview, open **Actions → Publish Instagram reels → Run workflow**, leave **mode = preview**, and run it. The workflow renders a Reel and uploads a `reel-preview` artifact; it does not contact Buffer or publish anything.
+
+After both secrets are present and the facts in `config/profile.yml` have been checked, you can optionally run the same workflow with **mode = live-due**. That mode behaves like the scheduler and can publish whichever normal slot is currently due.
 
 ## Files
 
