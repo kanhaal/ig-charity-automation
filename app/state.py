@@ -42,13 +42,23 @@ def next_due_slot(profile_cfg: dict, state: dict, now: datetime | None = None) -
     date_text = local_now.date().isoformat()
     current_time = local_now.time().replace(tzinfo=None)
 
-    for idx, scheduled in enumerate(account["posting_times"]):
-        slot_id = f"{date_text}-{idx + 1}"
-        if slot_id in state["published"]:
-            continue
-        if current_time >= _parse_hhmm(scheduled):
-            return DueSlot(slot_id, date_text, idx, scheduled)
-    return None
+    due_indices = [
+        idx
+        for idx, scheduled in enumerate(account["posting_times"])
+        if current_time >= _parse_hhmm(scheduled)
+    ]
+    if not due_indices:
+        return None
+
+    # Only the latest slot that has opened is eligible. This deliberately drops
+    # a missed morning slot once the evening slot begins, preventing two stale
+    # reels from being dumped close together at night.
+    idx = due_indices[-1]
+    scheduled = account["posting_times"][idx]
+    slot_id = f"{date_text}-{idx + 1}"
+    if slot_id in state["published"]:
+        return None
+    return DueSlot(slot_id, date_text, idx, scheduled)
 
 
 def mark_published(
