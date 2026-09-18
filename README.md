@@ -35,25 +35,41 @@ The current fact block was carried over from the reference copy supplied for thi
 
 Tracks are automatically downloaded from the licensed sources in `config/music.yml`, cached by GitHub Actions, and embedded into the rendered MP4. Selection is mood-based and avoids the previous track when possible.
 
-The included library uses CC0/public-domain-style sources listed in `LICENSES.md`. The project deliberately does not scrape or download copyrighted Spotify/Instagram/TikTok songs.
+The included library uses CC0-style sources listed in `LICENSES.md`. The project deliberately does not scrape or download copyrighted Spotify/Instagram/TikTok songs.
 
 ## One-time setup
 
-Connect `@kiaraprmd` to Buffer as an Instagram **Creator or Business** account and create a Buffer API key. Create a free Cloudinary account.
+Only **two GitHub repository secrets** are required:
 
-In this repository go to:
+- `BUFFER_API_KEY`
+- `CLOUDINARY_URL`
+
+The Buffer channel ID is auto-detected from the `@kiaraprmd` Instagram handle configured in `config/profile.yml`. If the Buffer account has multiple Instagram channels and auto-detection is ever ambiguous, `BUFFER_CHANNEL_ID` can optionally be added as an override.
+
+### Buffer
+
+1. Create/log in to Buffer.
+2. Connect the Instagram account `@kiaraprmd` as an Instagram professional channel.
+3. In Buffer, open **Settings → API**.
+4. Create a personal API key and copy it.
+5. In GitHub, add it as the repository secret `BUFFER_API_KEY`.
+
+### Cloudinary
+
+1. Create/log in to Cloudinary.
+2. Open **Settings → API Keys**.
+3. Copy the full **API environment variable** beginning with `cloudinary://`.
+4. In GitHub, add that entire value as the repository secret `CLOUDINARY_URL`.
+
+### GitHub
+
+In this repository open:
 
 `Settings → Secrets and variables → Actions → New repository secret`
 
-Add:
+Add the two secrets above. Never paste either secret into source files, Issues, commits, or chat screenshots.
 
-- `BUFFER_API_KEY`
-- `BUFFER_CHANNEL_ID`
-- `CLOUDINARY_CLOUD_NAME`
-- `CLOUDINARY_API_KEY`
-- `CLOUDINARY_API_SECRET`
-
-After those five secrets are set, the scheduled workflow handles generation, music, rendering, upload, publishing, retries, and state tracking by itself.
+After those two secrets are set, the scheduled workflow handles generation, music, rendering, media hosting, Buffer publishing, retries, and state tracking by itself.
 
 ## Run flow
 
@@ -65,18 +81,15 @@ After those five secrets are set, the scheduled workflow handles generation, mus
 6. Select a mood-matched track.
 7. Render a 1080×1920, 30 fps, 12-second H.264/AAC Reel.
 8. Upload the MP4 to Cloudinary.
-9. Send it to Buffer as an Instagram Reel shared to feed.
-10. Record the successful slot in `state/posted.json`.
+9. Auto-detect the connected `@kiaraprmd` Buffer channel.
+10. Schedule it through Buffer as an Instagram Reel shared to feed.
+11. Record the successful slot in `state/posted.json`.
 
-## Optional local smoke test
+## Safe test
 
-```bash
-python -m pip install -e ".[dev]"
-pytest -q
-python -m app.main --render-only --force-slot 2026-09-18-1
-```
+The CI workflow performs an offline render test automatically on every push.
 
-`--render-only` never publishes.
+For an end-to-end live test, use **Actions → Publish Instagram reels → Run workflow** only after both secrets are present and the facts in `config/profile.yml` have been checked. If a normal slot is already due, that dispatch can publish it.
 
 ## Files
 
