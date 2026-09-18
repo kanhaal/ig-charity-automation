@@ -7,7 +7,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
+
     steps:
       - uses: actions/checkout@v4
 
@@ -16,7 +17,7 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
 
-      - name: Install FFmpeg and fonts
+      - name: Install FFmpeg and fallback fonts
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-dejavu-core
@@ -36,15 +37,16 @@ jobs:
           ffmpeg -y -f lavfi -i "sine=frequency=220:duration=14" /tmp/ig-charity-smoke/music.wav >/dev/null 2>&1
           python - <<'PY'
           from pathlib import Path
+
           from app.content import ReelCopy
           from app.music import MusicTrack
           from app.render import render_reel
 
           result = render_reel(
               copy=ReelCopy(
-                  hook="please stop scrolling for a few seconds.",
+                  hook="if you can spare 10 seconds, please read this.",
                   body="This is an offline CI render used only to verify the media pipeline.",
-                  cta="link in bio.",
+                  cta="If you can help, the Razorpay link is in my bio.",
                   caption="smoke test",
                   mood="calm",
                   signature="ci",
@@ -59,8 +61,10 @@ jobs:
               slot_id="ci-smoke-1",
               duration_seconds=12,
               out_dir=Path("/tmp/ig-charity-smoke/output"),
+              font_cache_dir=Path("/tmp/ig-charity-smoke/fonts"),
           )
           assert result.video.exists()
           assert result.video.stat().st_size > 150_000
+          assert result.cover.exists()
           print(result.video)
           PY
