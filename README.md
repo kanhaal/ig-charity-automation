@@ -2,7 +2,26 @@
 
 Fully automated Instagram Reel production for `@kiaraprmd`.
 
-The system generates a text-first 9:16 Reel, automatically downloads/chooses matching licensed music, renders the final MP4 with FFmpeg, uploads it to Cloudinary, then publishes it to Instagram through Buffer. GitHub Actions runs it in the cloud, so no laptop or phone needs to stay online.
+The system generates a text-first 9:16 Reel, automatically chooses copyright-safe emotional music, renders the final MP4 with FFmpeg, uploads it to Cloudinary, then publishes it to Instagram through Buffer. GitHub Actions runs it in the cloud, so no laptop or phone needs to stay online.
+
+## Current visual style
+
+The renderer now uses:
+
+- lighter orange / peach / coral / pink Instagram-style gradients
+- Poppins ExtraBold for hooks and CTAs
+- Inter Medium for body text
+- cleaner spacing and shorter on-screen copy
+- no username/link footer at the bottom
+- the "link in bio" message only inside the CTA
+
+Fonts are downloaded automatically from Google Fonts and cached by GitHub Actions. DejaVu remains a fallback if the font download is ever unavailable.
+
+## Music
+
+The music library is fully automatic and mood-based. It now includes additional emotional / melancholic / piano tracks, including short emotional piano and a more indie/melancholic instrumental option.
+
+Commercial songs such as Sydney Gish tracks or other copyrighted trending audio are deliberately **not** downloaded and embedded automatically. That would create mute/takedown risk and make the unattended system unreliable. The automated library instead targets the same sad / calm / indie-emotional vibe using reusable music whose source/license is documented in `LICENSES.md`.
 
 ## Schedule
 
@@ -11,95 +30,41 @@ Default local posting slots (`Asia/Kolkata`):
 - 11:37
 - 20:07
 
-The workflow also has catch-up checks later in each window. `state/posted.json` makes the process idempotent, so catch-up runs do nothing after a slot succeeds.
-
-## Reused logic from AutoTube Lab
-
-`autotube-lab` is a much heavier research/TTS/Remotion pipeline. This project reuses the parts that fit this job:
-
-- source-locked content generation instead of inventing facts
-- deterministic slot/state logic
-- mood-based audio selection
-- FFmpeg media rendering/mixing
-- retry/fail-closed publishing boundaries
-
-The local LLM, TTS, Playwright, GPU stack, Remotion scenes, and YouTube publisher are intentionally not copied because a static-text charity Reel does not need them.
+Catch-up runs occur after each slot. `state/posted.json` prevents duplicates. If a morning slot is completely missed until the evening window opens, it is dropped rather than dumping two stale Reels close together.
 
 ## Truthfulness guard
 
-The copy generator can only remix the statements in `config/profile.yml`. It does **not** invent new illnesses, donation totals, emergencies, deadlines, or family circumstances.
-
-The current fact block was carried over from the reference copy supplied for this page. Keep it accurate; edit or remove any line that is not true.
-
-## Music
-
-Tracks are automatically downloaded from the licensed sources in `config/music.yml`, cached by GitHub Actions, and embedded into the rendered MP4. Selection is mood-based and avoids the previous track when possible.
-
-The included library uses CC0-style sources listed in `LICENSES.md`. The project deliberately does not scrape or download copyrighted Spotify/Instagram/TikTok songs.
+The copy generator only remixes statements in `config/profile.yml`. It does not invent illnesses, donation totals, emergencies, deadlines, or family circumstances. Keep those approved facts accurate.
 
 ## One-time setup
 
-Only **two GitHub repository secrets** are required:
+Required GitHub repository secrets:
 
 - `BUFFER_API_KEY`
 - `CLOUDINARY_URL`
 
-The Buffer channel ID is auto-detected from the `@kiaraprmd` Instagram handle configured in `config/profile.yml`. If the Buffer account has multiple Instagram channels and auto-detection is ever ambiguous, `BUFFER_CHANNEL_ID` can optionally be added as an override.
+Buffer channel ID is auto-detected from the configured `@kiaraprmd` handle. `BUFFER_CHANNEL_ID` is only an optional override if auto-detection is ambiguous.
 
-### Buffer
+## Preview
 
-1. Create/log in to Buffer.
-2. Connect the Instagram account `@kiaraprmd` as an Instagram professional channel.
-3. In Buffer, open **Settings → API**.
-4. Create a personal API key and copy it.
-5. In GitHub, add it as the repository secret `BUFFER_API_KEY`.
+Open:
 
-### Cloudinary
+**Actions → Publish Instagram reels → Run workflow → mode = preview**
 
-1. Create/log in to Cloudinary.
-2. Open **Settings → API Keys**.
-3. Copy the full **API environment variable** beginning with `cloudinary://`.
-4. In GitHub, add that entire value as the repository secret `CLOUDINARY_URL`.
+That renders a Reel and uploads a `reel-preview` artifact. It does **not** contact Buffer or publish to Instagram.
 
-### GitHub
+## Live operation
 
-In this repository open:
+Once the two secrets are configured, scheduled runs:
 
-`Settings → Secrets and variables → Actions → New repository secret`
+1. pick the currently due slot
+2. generate fresh source-locked copy
+3. choose a light Instagram-style visual preset
+4. choose a mood-matched music track
+5. render 1080×1920 H.264/AAC
+6. upload the MP4 to Cloudinary
+7. auto-detect the Buffer Instagram channel
+8. schedule the Reel
+9. record the successful slot in `state/posted.json`
 
-Add the two secrets above. Never paste either secret into source files, Issues, commits, or chat screenshots.
-
-After those two secrets are set, the scheduled workflow handles generation, music, rendering, media hosting, Buffer publishing, retries, and state tracking by itself.
-
-## Run flow
-
-1. Check whether today's first or second slot is due.
-2. Skip if that slot is already recorded.
-3. Build fresh copy from approved facts + rotating hooks/story angles/CTAs.
-4. Pick a visual theme.
-5. Download/cache the licensed music library if needed.
-6. Select a mood-matched track.
-7. Render a 1080×1920, 30 fps, 12-second H.264/AAC Reel.
-8. Upload the MP4 to Cloudinary.
-9. Auto-detect the connected `@kiaraprmd` Buffer channel.
-10. Schedule it through Buffer as an Instagram Reel shared to feed.
-11. Record the successful slot in `state/posted.json`.
-
-## Safe test
-
-The CI workflow performs an offline render test automatically on every push.
-
-For a no-post preview, open **Actions → Publish Instagram reels → Run workflow**, leave **mode = preview**, and run it. The workflow renders a Reel and uploads a `reel-preview` artifact; it does not contact Buffer or publish anything.
-
-After both secrets are present and the facts in `config/profile.yml` have been checked, you can optionally run the same workflow with **mode = live-due**. That mode behaves like the scheduler and can publish whichever normal slot is currently due.
-
-## Files
-
-- `config/profile.yml` — schedule, approved facts, CTA and hashtags
-- `config/music.yml` — mood-tagged licensed music sources
-- `app/content.py` — copy/story variation engine
-- `app/music.py` — downloader/cache/selector
-- `app/render.py` — 9:16 design renderer + FFmpeg encoder
-- `app/publish.py` — Cloudinary + Buffer API integration
-- `app/state.py` — due-slot and duplicate prevention
-- `.github/workflows/post.yml` — unattended cloud scheduler
+No Stories are generated.
