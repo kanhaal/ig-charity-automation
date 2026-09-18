@@ -9,6 +9,7 @@ import subprocess
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from app.content import ReelCopy
+from app.fonts import get_font_path
 from app.music import MusicTrack
 
 
@@ -23,68 +24,55 @@ class RenderResult:
     style_name: str
 
 
+# Instagram-story-inspired light gradients. Kept intentionally bright and soft
+# so the text feels native to Instagram rather than like a generic dark poster.
 STYLES = [
     {
-        "name": "charcoal",
-        "top": (25, 27, 33),
-        "bottom": (43, 46, 54),
+        "name": "insta_orange",
+        "top": (255, 184, 100),
+        "bottom": (255, 104, 86),
         "accent": (255, 255, 255),
-        "muted": (226, 229, 235),
+        "body": (255, 247, 244),
+        "cta": (255, 255, 255),
         "align": "center",
     },
     {
-        "name": "warm_gradient",
-        "top": (246, 75, 36),
-        "bottom": (255, 38, 91),
+        "name": "peach_pink",
+        "top": (255, 194, 121),
+        "bottom": (255, 91, 131),
         "accent": (255, 255, 255),
-        "muted": (255, 247, 241),
+        "body": (255, 245, 242),
+        "cta": (255, 255, 255),
         "align": "center",
     },
     {
-        "name": "dusk",
-        "top": (53, 44, 82),
-        "bottom": (18, 23, 42),
+        "name": "sunset_coral",
+        "top": (255, 202, 125),
+        "bottom": (246, 112, 104),
         "accent": (255, 255, 255),
-        "muted": (233, 229, 244),
+        "body": (255, 248, 245),
+        "cta": (255, 255, 255),
         "align": "center",
     },
     {
-        "name": "blue_fog",
-        "top": (36, 72, 99),
-        "bottom": (20, 28, 39),
-        "accent": (247, 251, 255),
-        "muted": (220, 233, 242),
+        "name": "soft_instagram",
+        "top": (255, 178, 100),
+        "bottom": (238, 88, 127),
+        "accent": (255, 255, 255),
+        "body": (255, 246, 243),
+        "cta": (255, 255, 255),
         "align": "left",
     },
     {
-        "name": "soft_rose",
-        "top": (118, 65, 78),
-        "bottom": (36, 27, 37),
-        "accent": (255, 250, 250),
-        "muted": (244, 224, 229),
-        "align": "center",
-    },
-    {
-        "name": "midnight",
-        "top": (7, 11, 18),
-        "bottom": (24, 35, 49),
+        "name": "light_coral",
+        "top": (255, 191, 135),
+        "bottom": (255, 111, 106),
         "accent": (255, 255, 255),
-        "muted": (210, 220, 232),
-        "align": "left",
+        "body": (255, 247, 244),
+        "cta": (255, 255, 255),
+        "align": "center",
     },
 ]
-
-
-def _font(bold: bool, size: int) -> ImageFont.FreeTypeFont:
-    name = "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
-    candidates = [
-        Path("/usr/share/fonts/truetype/dejavu") / name,
-        Path("/usr/share/fonts/dejavu") / name,
-    ]
-    for path in candidates:
-        if path.exists():
-            return ImageFont.truetype(str(path), size=size)
-    return ImageFont.truetype(name, size=size)
 
 
 def _gradient(top: tuple[int, int, int], bottom: tuple[int, int, int]) -> Image.Image:
@@ -101,20 +89,49 @@ def _decorate(image: Image.Image, seed: int) -> Image.Image:
     rng = random.Random(seed)
     overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
-    for _ in range(5):
-        cx = rng.randint(-150, WIDTH + 150)
-        cy = rng.randint(-200, HEIGHT + 200)
-        r = rng.randint(160, 360)
-        alpha = rng.randint(10, 24)
-        draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(255, 255, 255, alpha))
-    overlay = overlay.filter(ImageFilter.GaussianBlur(110))
+
+    # Soft blurred light blobs make the background feel closer to Instagram's
+    # built-in gradient templates without copying any single template exactly.
+    for _ in range(8):
+        cx = rng.randint(-140, WIDTH + 140)
+        cy = rng.randint(-160, HEIGHT + 160)
+        radius = rng.randint(180, 380)
+        alpha = rng.randint(8, 22)
+        color = rng.choice(
+            [
+                (255, 255, 255, alpha),
+                (255, 224, 198, alpha),
+                (255, 206, 171, alpha),
+            ]
+        )
+        draw.ellipse(
+            (cx - radius, cy - radius, cx + radius, cy + radius),
+            fill=color,
+        )
+    overlay = overlay.filter(ImageFilter.GaussianBlur(120))
     return Image.alpha_composite(image.convert("RGBA"), overlay).convert("RGB")
 
 
-def _wrap(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, max_width: int) -> str:
+def _font(
+    cache_dir: Path,
+    family: str,
+    weight: str,
+    size: int,
+) -> ImageFont.FreeTypeFont:
+    path = get_font_path(cache_dir, family, weight)
+    return ImageFont.truetype(str(path), size=size)
+
+
+def _wrap(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font: ImageFont.FreeTypeFont,
+    max_width: int,
+) -> str:
     words = text.split()
     lines: list[str] = []
     current: list[str] = []
+
     for word in words:
         candidate = " ".join(current + [word])
         bbox = draw.textbbox((0, 0), candidate, font=font)
@@ -123,66 +140,96 @@ def _wrap(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, ma
         else:
             lines.append(" ".join(current))
             current = [word]
+
     if current:
         lines.append(" ".join(current))
     return "\n".join(lines)
 
 
-def _text_block_height(
-    draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, spacing: int
+def _text_height(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font: ImageFont.FreeTypeFont,
+    spacing: int,
 ) -> int:
     bbox = draw.multiline_textbbox((0, 0), text, font=font, spacing=spacing)
     return bbox[3] - bbox[1]
 
 
 def _fit_body(
-    draw: ImageDraw.ImageDraw, text: str, width: int, max_height: int
+    draw: ImageDraw.ImageDraw,
+    cache_dir: Path,
+    text: str,
+    width: int,
+    max_height: int,
 ) -> tuple[ImageFont.FreeTypeFont, str, int]:
-    for size in range(49, 34, -2):
-        font = _font(False, size)
+    for size in range(50, 35, -2):
+        font = _font(cache_dir, "Inter", "regular", size)
         wrapped = _wrap(draw, text, font, width)
-        spacing = max(12, int(size * 0.34))
-        if _text_block_height(draw, wrapped, font, spacing) <= max_height:
+        spacing = max(11, int(size * 0.34))
+        if _text_height(draw, wrapped, font, spacing) <= max_height:
             return font, wrapped, spacing
-    font = _font(False, 34)
-    return font, _wrap(draw, text, font, width), 12
+
+    font = _font(cache_dir, "Inter", "regular", 34)
+    return font, _wrap(draw, text, font, width), 11
 
 
-def create_cover(copy: ReelCopy, slot_id: str, out: Path) -> tuple[Path, str]:
+def create_cover(
+    copy: ReelCopy,
+    slot_id: str,
+    out: Path,
+    font_cache_dir: Path,
+) -> tuple[Path, str]:
     seed = int(hashlib.sha256((slot_id + ":style").encode()).hexdigest()[:16], 16)
     rng = random.Random(seed)
     style = rng.choice(STYLES)
 
     image = _decorate(_gradient(style["top"], style["bottom"]), seed)
     draw = ImageDraw.Draw(image)
-    margin = 92
+
+    margin = 88
     max_width = WIDTH - margin * 2
     align = style["align"]
     anchor_x = WIDTH // 2 if align == "center" else margin
     anchor = "ma" if align == "center" else "la"
 
-    hook_font = _font(True, 64 if align == "center" else 58)
+    hook_font = _font(
+        font_cache_dir,
+        "Poppins",
+        "bold",
+        72 if align == "center" else 66,
+    )
     hook = _wrap(draw, copy.hook, hook_font, max_width)
     hook_spacing = 14
 
-    body_font, body, body_spacing = _fit_body(draw, copy.body, max_width, 740)
-    cta_font = _font(True, 38)
+    # Body is intentionally capped lower than before so the layout breathes.
+    body_font, body, body_spacing = _fit_body(
+        draw,
+        font_cache_dir,
+        copy.body,
+        max_width,
+        620,
+    )
+
+    cta_font = _font(font_cache_dir, "Poppins", "bold", 41)
     cta = _wrap(draw, copy.cta, cta_font, max_width)
     cta_spacing = 12
 
-    hook_h = _text_block_height(draw, hook, hook_font, hook_spacing)
-    body_h = _text_block_height(draw, body, body_font, body_spacing)
-    cta_h = _text_block_height(draw, cta, cta_font, cta_spacing)
-    gaps = 54 + 58
-    total_h = hook_h + body_h + cta_h + gaps
-    y = max(260, (HEIGHT - total_h) // 2 - 10)
+    hook_h = _text_height(draw, hook, hook_font, hook_spacing)
+    body_h = _text_height(draw, body, body_font, body_spacing)
+    cta_h = _text_height(draw, cta, cta_font, cta_spacing)
 
-    shadow = (0, 0, 0)
+    total_h = hook_h + 72 + body_h + 72 + cta_h
+    y = max(220, (HEIGHT - total_h) // 2 - 12)
+
+    # A small shadow gives the big white hook enough contrast without making
+    # the whole design feel heavy.
+    shadow_fill = (47, 34, 39)
     draw.multiline_text(
-        (anchor_x + 2, y + 3),
+        (anchor_x + 3, y + 4),
         hook,
         font=hook_font,
-        fill=shadow,
+        fill=shadow_fill,
         spacing=hook_spacing,
         align=align,
         anchor=anchor,
@@ -196,39 +243,39 @@ def create_cover(copy: ReelCopy, slot_id: str, out: Path) -> tuple[Path, str]:
         align=align,
         anchor=anchor,
     )
-    y += hook_h + 54
 
+    y += hook_h + 72
     draw.multiline_text(
         (anchor_x, y),
         body,
         font=body_font,
-        fill=style["muted"],
+        fill=style["body"],
         spacing=body_spacing,
         align=align,
         anchor=anchor,
     )
-    y += body_h + 58
 
+    y += body_h + 72
+    draw.multiline_text(
+        (anchor_x + 2, y + 2),
+        cta,
+        font=cta_font,
+        fill=shadow_fill,
+        spacing=cta_spacing,
+        align=align,
+        anchor=anchor,
+    )
     draw.multiline_text(
         (anchor_x, y),
         cta,
         font=cta_font,
-        fill=style["accent"],
+        fill=style["cta"],
         spacing=cta_spacing,
         align=align,
         anchor=anchor,
     )
 
-    footer_font = _font(False, 27)
-    footer = "@kiaraprmd  •  link in bio"
-    draw.text(
-        (WIDTH // 2, HEIGHT - 126),
-        footer,
-        font=footer_font,
-        fill=(226, 230, 236),
-        anchor="mm",
-    )
-
+    # Deliberately no footer: the CTA already says "link in bio".
     out.parent.mkdir(parents=True, exist_ok=True)
     image.save(out, quality=95)
     return out, style["name"]
@@ -241,14 +288,29 @@ def render_reel(
     slot_id: str,
     duration_seconds: int,
     out_dir: Path,
+    font_cache_dir: Path,
 ) -> RenderResult:
     out_dir.mkdir(parents=True, exist_ok=True)
-    cover, style_name = create_cover(copy, slot_id, out_dir / f"{slot_id}.jpg")
+    cover, style_name = create_cover(
+        copy,
+        slot_id,
+        out_dir / f"{slot_id}.jpg",
+        font_cache_dir,
+    )
     video = out_dir / f"{slot_id}.mp4"
 
-    fade_out = max(0.0, float(duration_seconds) - 1.2)
-    vf = f"fade=t=in:st=0:d=0.45,fade=t=out:st={fade_out:.2f}:d=1.0,format=yuv420p"
-    af = f"volume=0.22,afade=t=in:st=0:d=1.0,afade=t=out:st={fade_out:.2f}:d=1.0"
+    fade_out = max(0.0, float(duration_seconds) - 1.0)
+    vf = (
+        f"scale={WIDTH}:{HEIGHT},"
+        "fade=t=in:st=0:d=0.35,"
+        f"fade=t=out:st={fade_out:.2f}:d=0.85,"
+        "format=yuv420p"
+    )
+    af = (
+        "volume=0.24,"
+        "afade=t=in:st=0:d=0.8,"
+        f"afade=t=out:st={fade_out:.2f}:d=0.85"
+    )
 
     command = [
         "ffmpeg",
@@ -274,17 +336,28 @@ def render_reel(
         "-preset",
         "veryfast",
         "-crf",
-        "22",
+        "21",
         "-c:a",
         "aac",
         "-b:a",
-        "128k",
+        "160k",
         "-movflags",
         "+faststart",
         "-shortest",
         str(video),
     ]
-    subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    subprocess.run(
+        command,
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+    )
+
     if not video.exists() or video.stat().st_size < 150_000:
         raise RuntimeError("rendered reel is missing or unexpectedly small")
-    return RenderResult(video=video, cover=cover, style_name=style_name)
+
+    return RenderResult(
+        video=video,
+        cover=cover,
+        style_name=style_name,
+    )
