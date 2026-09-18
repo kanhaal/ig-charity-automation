@@ -60,6 +60,7 @@ def main() -> int:
         slot_id=slot.slot_id,
         duration_seconds=int(cfg["account"].get("reel_seconds", 12)),
         out_dir=ROOT / "output",
+        font_cache_dir=ROOT / ".cache" / "fonts",
     )
 
     if args.render_only:
