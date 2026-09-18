@@ -22,6 +22,15 @@ on:
     - cron: '7 23 * * *'
       timezone: 'Asia/Kolkata'
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Manual action'
+        required: true
+        type: choice
+        default: preview
+        options:
+          - preview
+          - live-due
 
 permissions:
   contents: write
@@ -58,13 +67,29 @@ jobs:
           path: .cache/music
           key: charity-music-${{ hashFiles('config/music.yml') }}
 
+      - name: Render safe manual preview
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'preview'
+        run: python -m app.main --render-only --force-slot 2099-01-01-1
+
+      - name: Upload manual preview
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'preview'
+        uses: actions/upload-artifact@v4
+        with:
+          name: reel-preview
+          path: |
+            output/*.mp4
+            output/*.jpg
+          retention-days: 3
+
       - name: Generate and publish the due Reel
+        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'live-due')
         env:
           BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
           CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
         run: python -m app.main
 
       - name: Persist successful publish state
+        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'live-due')
         run: |
           if git diff --quiet -- state/posted.json; then
             echo "No state change; nothing was due or publish did not complete."
