@@ -24,8 +24,6 @@ class RenderResult:
     style_name: str
 
 
-# Instagram-story-inspired light gradients. Kept intentionally bright and soft
-# so the text feels native to Instagram rather than like a generic dark poster.
 STYLES = [
     {
         "name": "insta_orange",
@@ -90,8 +88,6 @@ def _decorate(image: Image.Image, seed: int) -> Image.Image:
     overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
 
-    # Soft blurred light blobs make the background feel closer to Instagram's
-    # built-in gradient templates without copying any single template exactly.
     for _ in range(8):
         cx = rng.randint(-140, WIDTH + 140)
         cy = rng.randint(-160, HEIGHT + 160)
@@ -108,6 +104,7 @@ def _decorate(image: Image.Image, seed: int) -> Image.Image:
             (cx - radius, cy - radius, cx + radius, cy + radius),
             fill=color,
         )
+
     overlay = overlay.filter(ImageFilter.GaussianBlur(120))
     return Image.alpha_composite(image.convert("RGBA"), overlay).convert("RGB")
 
@@ -174,12 +171,21 @@ def _fit_body(
     return font, _wrap(draw, text, font, width), 11
 
 
+def _default_font_cache(out: Path) -> Path:
+    # Keep cache beside the normal output tree. This makes direct/test callers
+    # work without having to know about the font-cache implementation detail.
+    return Path(out).parent / ".cache" / "fonts"
+
+
 def create_cover(
     copy: ReelCopy,
     slot_id: str,
     out: Path,
-    font_cache_dir: Path,
+    font_cache_dir: Path | None = None,
 ) -> tuple[Path, str]:
+    out = Path(out)
+    font_cache = Path(font_cache_dir) if font_cache_dir is not None else _default_font_cache(out)
+
     seed = int(hashlib.sha256((slot_id + ":style").encode()).hexdigest()[:16], 16)
     rng = random.Random(seed)
     style = rng.choice(STYLES)
@@ -194,7 +200,7 @@ def create_cover(
     anchor = "ma" if align == "center" else "la"
 
     hook_font = _font(
-        font_cache_dir,
+        font_cache,
         "Poppins",
         "bold",
         72 if align == "center" else 66,
@@ -202,16 +208,15 @@ def create_cover(
     hook = _wrap(draw, copy.hook, hook_font, max_width)
     hook_spacing = 14
 
-    # Body is intentionally capped lower than before so the layout breathes.
     body_font, body, body_spacing = _fit_body(
         draw,
-        font_cache_dir,
+        font_cache,
         copy.body,
         max_width,
         620,
     )
 
-    cta_font = _font(font_cache_dir, "Poppins", "bold", 41)
+    cta_font = _font(font_cache, "Poppins", "bold", 41)
     cta = _wrap(draw, copy.cta, cta_font, max_width)
     cta_spacing = 12
 
@@ -222,8 +227,6 @@ def create_cover(
     total_h = hook_h + 72 + body_h + 72 + cta_h
     y = max(220, (HEIGHT - total_h) // 2 - 12)
 
-    # A small shadow gives the big white hook enough contrast without making
-    # the whole design feel heavy.
     shadow_fill = (47, 34, 39)
     draw.multiline_text(
         (anchor_x + 3, y + 4),
@@ -275,7 +278,6 @@ def create_cover(
         anchor=anchor,
     )
 
-    # Deliberately no footer: the CTA already says "link in bio".
     out.parent.mkdir(parents=True, exist_ok=True)
     image.save(out, quality=95)
     return out, style["name"]
@@ -288,14 +290,21 @@ def render_reel(
     slot_id: str,
     duration_seconds: int,
     out_dir: Path,
-    font_cache_dir: Path,
+    font_cache_dir: Path | None = None,
 ) -> RenderResult:
+    out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    font_cache = (
+        Path(font_cache_dir)
+        if font_cache_dir is not None
+        else out_dir.parent / ".cache" / "fonts"
+    )
+
     cover, style_name = create_cover(
         copy,
         slot_id,
         out_dir / f"{slot_id}.jpg",
-        font_cache_dir,
+        font_cache,
     )
     video = out_dir / f"{slot_id}.mp4"
 
@@ -346,12 +355,17 @@ def render_reel(
         "-shortest",
         str(video),
     ]
-    subprocess.run(
-        command,
-        check=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-    )
+
+    try:
+        subprocess.run(
+            command,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+        )
+    except subprocess.CalledProcessError as exc:
+        detail = exc.stderr.decode("utf-8", errors="replace")[-4000:]
+        raise RuntimeError(f"FFmpeg Reel render failed: {detail}") from exc
 
     if not video.exists() or video.stat().st_size < 150_000:
         raise RuntimeError("rendered reel is missing or unexpectedly small")
