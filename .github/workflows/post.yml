@@ -2,15 +2,15 @@ name: Publish Instagram reels
 
 on:
   schedule:
-    # Two primary slots plus catch-up checks. The scheduler is idempotent, so
-    # catch-up runs no-op after success. Non-zero minutes avoid GitHub's busiest
-    # top-of-hour scheduling window.
+    # Primary morning window + catch-ups.
     - cron: '37 11 * * *'
       timezone: 'Asia/Kolkata'
     - cron: '17 12 * * *'
       timezone: 'Asia/Kolkata'
     - cron: '7 13 * * *'
       timezone: 'Asia/Kolkata'
+
+    # Primary evening window + catch-ups.
     - cron: '7 20 * * *'
       timezone: 'Asia/Kolkata'
     - cron: '47 20 * * *'
@@ -21,6 +21,7 @@ on:
       timezone: 'Asia/Kolkata'
     - cron: '7 23 * * *'
       timezone: 'Asia/Kolkata'
+
   workflow_dispatch:
     inputs:
       mode:
@@ -42,7 +43,8 @@ concurrency:
 jobs:
   publish-due-reel:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 18
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -53,7 +55,7 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
 
-      - name: Install FFmpeg and fonts
+      - name: Install FFmpeg and fallback fonts
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-dejavu-core
@@ -61,11 +63,13 @@ jobs:
       - name: Install app
         run: python -m pip install -e .
 
-      - name: Cache licensed music
+      - name: Cache downloaded music and fonts
         uses: actions/cache@v4
         with:
-          path: .cache/music
-          key: charity-music-${{ hashFiles('config/music.yml') }}
+          path: |
+            .cache/music
+            .cache/fonts
+          key: charity-assets-${{ hashFiles('config/music.yml', 'app/fonts.py') }}
 
       - name: Render safe manual preview
         if: github.event_name == 'workflow_dispatch' && inputs.mode == 'preview'
