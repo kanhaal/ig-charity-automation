@@ -86,6 +86,7 @@ def main() -> int:
         slot_id=slot.slot_id,
         caption=copy.caption,
         share_to_feed=bool(cfg["account"].get("share_to_feed", True)),
+        instagram_handle=str(cfg["account"]["handle"]),
     )
     mark_published(
         state,
