@@ -1,0 +1,25 @@
+# Music is downloaded automatically from Wikimedia Commons and cached by GitHub Actions.
+tracks:
+  - id: komiku_sad_piano
+    filename: "Komiku - 32 - Sad walk with sad piano.ogg"
+    moods: [sad, reflective, vulnerable]
+    license: CC0-1.0
+    source_page: "https://commons.wikimedia.org/wiki/File:Komiku_-_32_-_Sad_walk_with_sad_piano.ogg"
+
+  - id: komiku_sad_melodica
+    filename: "Komiku - 14 - Sad walk with sad melodica.ogg"
+    moods: [sad, reflective]
+    license: CC0-1.0
+    source_page: "https://commons.wikimedia.org/wiki/File:Komiku_-_14_-_Sad_walk_with_sad_melodica.ogg"
+
+  - id: frederic_stay_calm
+    filename: "Frederic Lardon - 04 - Stay Calm.ogg"
+    moods: [calm, hopeful, reflective]
+    license: CC0-1.0
+    source_page: "https://commons.wikimedia.org/wiki/File:Frederic_Lardon_-_04_-_Stay_Calm.ogg"
+
+  - id: shumi_piano
+    filename: "Shumi-Marista Piano Instrumental.ogg"
+    moods: [calm, hopeful]
+    license: CC0-1.0
+    source_page: "https://commons.wikimedia.org/wiki/File:Shumi-Marista_Piano_Instrumental.ogg"
