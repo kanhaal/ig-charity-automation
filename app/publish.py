@@ -11,6 +11,9 @@ import cloudinary.uploader
 import requests
 
 
+BUFFER_ENDPOINT = "https://api.buffer.com"
+
+
 @dataclass(frozen=True)
 class PublishResult:
     buffer_post_id: str
@@ -24,13 +27,113 @@ def _required(name: str) -> str:
     return value
 
 
-def upload_video(video: Path, slot_id: str) -> str:
-    cloudinary.config(
-        cloud_name=_required("CLOUDINARY_CLOUD_NAME"),
-        api_key=_required("CLOUDINARY_API_KEY"),
-        api_secret=_required("CLOUDINARY_API_SECRET"),
-        secure=True,
+def _buffer_request(token: str, query: str, variables: dict | None = None) -> dict:
+    response = requests.post(
+        BUFFER_ENDPOINT,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+        json={"query": query, "variables": variables or {}},
+        timeout=60,
     )
+    response.raise_for_status()
+    payload = response.json()
+    if payload.get("errors"):
+        raise RuntimeError(f"Buffer GraphQL error: {payload['errors']}")
+    return payload.get("data") or {}
+
+
+def _normalise_handle(value: str | None) -> str:
+    return (value or "").strip().lower().replace("@", "").rstrip("/")
+
+
+def resolve_instagram_channel_id(token: str, target_handle: str) -> str:
+    configured = os.getenv("BUFFER_CHANNEL_ID", "").strip()
+    if configured:
+        return configured
+
+    org_data = _buffer_request(
+        token,
+        """
+        query GetOrganizations {
+          account {
+            organizations { id name }
+          }
+        }
+        """,
+    )
+    organizations = ((org_data.get("account") or {}).get("organizations") or [])
+    if not organizations:
+        raise RuntimeError("Buffer account has no organization available")
+
+    target = _normalise_handle(target_handle)
+    instagram_channels: list[dict] = []
+    for org in organizations:
+        org_id = str(org.get("id", "")).strip()
+        if not org_id:
+            continue
+        data = _buffer_request(
+            token,
+            """
+            query GetChannels($organizationId: OrganizationId!) {
+              channels(input: { organizationId: $organizationId }) {
+                id
+                name
+                displayName
+                service
+                externalLink
+                isDisconnected
+                isLocked
+                isQueuePaused
+              }
+            }
+            """,
+            {"organizationId": org_id},
+        )
+        for channel in data.get("channels") or []:
+            if str(channel.get("service", "")).lower() == "instagram":
+                instagram_channels.append(channel)
+
+    usable = [
+        channel
+        for channel in instagram_channels
+        if not channel.get("isDisconnected") and not channel.get("isLocked")
+    ]
+    if not usable:
+        raise RuntimeError(
+            "No usable Instagram channel is connected to Buffer. "
+            "Connect @kiaraprmd in Buffer first."
+        )
+
+    def matches(channel: dict) -> bool:
+        names = {
+            _normalise_handle(channel.get("name")),
+            _normalise_handle(channel.get("displayName")),
+        }
+        link = _normalise_handle(channel.get("externalLink"))
+        return target in names or (target and target in link)
+
+    matched = [channel for channel in usable if matches(channel)]
+    if len(matched) == 1:
+        return str(matched[0]["id"])
+    if not matched and len(usable) == 1:
+        return str(usable[0]["id"])
+
+    available = ", ".join(
+        str(channel.get("name") or channel.get("displayName") or channel.get("id"))
+        for channel in usable
+    )
+    raise RuntimeError(
+        f"Could not uniquely identify @{target_handle} in Buffer. "
+        f"Connected Instagram channels: {available}. "
+        "Set BUFFER_CHANNEL_ID only if you intentionally need to override auto-detection."
+    )
+
+
+def upload_video(video: Path, slot_id: str) -> str:
+    _required("CLOUDINARY_URL")
+    cloudinary.config(secure=True)
 
     last_error: Exception | None = None
     for delay in (0, 5, 15, 30, 60):
@@ -54,9 +157,15 @@ def upload_video(video: Path, slot_id: str) -> str:
     raise RuntimeError(f"Cloudinary upload failed after retries: {last_error}")
 
 
-def _post_to_buffer(*, media_url: str, caption: str, share_to_feed: bool) -> str:
+def _post_to_buffer(
+    *,
+    media_url: str,
+    caption: str,
+    share_to_feed: bool,
+    instagram_handle: str,
+) -> str:
     token = _required("BUFFER_API_KEY")
-    channel_id = _required("BUFFER_CHANNEL_ID")
+    channel_id = resolve_instagram_channel_id(token, instagram_handle)
 
     mutation = """
     mutation CreatePost($input: CreatePostInput!) {
@@ -102,37 +211,33 @@ def _post_to_buffer(*, media_url: str, caption: str, share_to_feed: bool) -> str
         if delay:
             time.sleep(delay)
         try:
-            response = requests.post(
-                "https://api.buffer.com",
-                headers={
-                    "Authorization": f"Bearer {token}",
-                    "Content-Type": "application/json",
-                },
-                json={"query": mutation, "variables": variables},
-                timeout=60,
-            )
-            response.raise_for_status()
-            payload = response.json()
-            if payload.get("errors"):
-                raise RuntimeError(f"Buffer GraphQL error: {payload['errors']}")
-            result = (payload.get("data") or {}).get("createPost") or {}
+            data = _buffer_request(token, mutation, variables)
+            result = data.get("createPost") or {}
             if result.get("message"):
                 raise RuntimeError(f"Buffer rejected the post: {result['message']}")
             post = result.get("post") or {}
             post_id = str(post.get("id", "")).strip()
             if not post_id:
-                raise RuntimeError(f"Buffer response did not contain a post id: {payload}")
+                raise RuntimeError(f"Buffer response did not contain a post id: {data}")
             return post_id
         except Exception as exc:
             last_error = exc
     raise RuntimeError(f"Buffer publish failed after retries: {last_error}")
 
 
-def publish_reel(*, video: Path, slot_id: str, caption: str, share_to_feed: bool) -> PublishResult:
+def publish_reel(
+    *,
+    video: Path,
+    slot_id: str,
+    caption: str,
+    share_to_feed: bool,
+    instagram_handle: str,
+) -> PublishResult:
     media_url = upload_video(video, slot_id)
     post_id = _post_to_buffer(
         media_url=media_url,
         caption=caption,
         share_to_feed=share_to_feed,
+        instagram_handle=instagram_handle,
     )
     return PublishResult(buffer_post_id=post_id, media_url=media_url)
