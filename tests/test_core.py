@@ -1,7 +1,9 @@
 from datetime import datetime
+from inspect import signature
 from zoneinfo import ZoneInfo
 
 from app.content import build_copy
+from app.render import render_reel
 from app.state import next_due_slot
 
 
@@ -54,3 +56,8 @@ def test_copy_is_deterministic_and_source_locked():
     assert any(value in one.body for value in PROFILE["approved_facts"].values())
     assert "donation cta" in one.caption
     assert "Razorpay link" in one.cta
+
+
+def test_render_reel_font_cache_is_optional_regression():
+    parameter = signature(render_reel).parameters["font_cache_dir"]
+    assert parameter.default is None
