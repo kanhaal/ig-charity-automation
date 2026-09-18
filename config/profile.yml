@@ -1,0 +1,31 @@
+account:
+  handle: kiaraprmd
+  timezone: Asia/Kolkata
+  posting_times:
+    - "11:37"
+    - "20:07"
+  reel_seconds: 12
+  share_to_feed: true
+  enabled: true
+
+# The generator is intentionally source-locked: it can only remix the facts below.
+# Keep these accurate and remove anything you do not want published.
+approved_facts:
+  student: "I'm from Assam, India, and I'm currently studying in Class 12."
+  finances: "My family is going through a difficult financial period with bills, loans, and debt."
+  father: "My dad has a job but lives far away, and his salary is not enough to cover everything we are dealing with."
+  mother_health: "My mom's health has been unstable, and some days she struggles even with normal housework."
+  education: "I'm trying to keep up with my studies because my education matters for my future, even when it is difficult to concentrate."
+  wellbeing: "I've also been dealing with loneliness, depression, and a lot of stress."
+  intent: "I'm not asking anyone to fix everything for me; I'm trying to get through a difficult period and help my family however I can."
+
+cta:
+  donation: "If you're able to help, even a small amount would mean a lot. The Razorpay link is in my bio."
+  share: "If you can't donate, sharing this page still helps it reach someone who might be able to."
+
+hashtags:
+  - HelpAStudent
+  - SupportEducation
+  - StudentFundraiser
+  - India
+  - Assam
