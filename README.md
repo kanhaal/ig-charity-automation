@@ -30,7 +30,7 @@ Default local posting slots (`Asia/Kolkata`):
 - 11:37
 - 20:07
 
-Catch-up runs occur after each slot. `state/posted.json` prevents duplicates. If a morning slot is completely missed until the evening window opens, it is dropped rather than dumping two stale Reels close together.
+The GitHub workflow uses explicit UTC cron values that correspond to those IST windows, while the Python scheduler still evaluates due slots in `Asia/Kolkata`. Morning catch-ups run at roughly 11:52, 12:07, 12:22, and 12:37 IST; evening catch-ups run at roughly 20:22, 20:37, 20:52, and 21:07 IST. `state/posted.json` prevents duplicates. If a morning slot is completely missed until the evening window opens, it is dropped rather than dumping two stale Reels close together.
 
 ## Truthfulness guard
 
