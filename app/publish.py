@@ -7,8 +7,6 @@ from pathlib import Path
 import time
 from urllib.parse import unquote, urlparse
 
-import cloudinary
-import cloudinary.uploader
 import requests
 
 
@@ -217,8 +215,49 @@ def _find_existing_post_id(
     return None
 
 
+def _normalise_cloudinary_url(raw: str) -> str:
+    value = raw.strip()
+    if (
+        len(value) >= 2
+        and value[0] == value[-1]
+        and value[0] in {"\"", "'"}
+    ):
+        value = value[1:-1].strip()
+
+    # Cloudinary's dashboard often presents this as a shell assignment:
+    # CLOUDINARY_URL=cloudinary://....
+    # GitHub Secrets should ideally contain only the value, but accepting the
+    # full assignment makes setup much less error-prone.
+    if value.startswith("CLOUDINARY_URL="):
+        value = value.split("=", 1)[1].strip()
+        if (
+            len(value) >= 2
+            and value[0] == value[-1]
+            and value[0] in {"\"", "'"}
+        ):
+            value = value[1:-1].strip()
+
+    if not value.startswith("cloudinary://"):
+        raise RuntimeError(
+            "CLOUDINARY_URL is invalid. It must contain a value beginning "
+            "with 'cloudinary://'. You may paste either that value directly "
+            "or the full CLOUDINARY_URL=cloudinary://... assignment."
+        )
+
+    return value
+
+
 def upload_video(video: Path, slot_id: str) -> str:
-    _required("CLOUDINARY_URL")
+    # Sanitize before importing Cloudinary: its SDK reads CLOUDINARY_URL at
+    # import time, so an accidentally pasted 'CLOUDINARY_URL=...' assignment
+    # would otherwise crash before we could correct it.
+    os.environ["CLOUDINARY_URL"] = _normalise_cloudinary_url(
+        _required("CLOUDINARY_URL")
+    )
+
+    import cloudinary
+    import cloudinary.uploader
+
     cloudinary.config(secure=True)
 
     last_error: Exception | None = None
