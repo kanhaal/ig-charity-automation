@@ -3,7 +3,7 @@ from inspect import signature
 from zoneinfo import ZoneInfo
 
 from app.content import build_copy
-from app.publish import _slot_matches_asset_url
+from app.publish import _normalise_cloudinary_url, _slot_matches_asset_url
 from app.render import render_reel
 from app.state import next_due_slot
 
@@ -73,3 +73,15 @@ def test_buffer_duplicate_asset_match_uses_slot_filename():
         "https://res.cloudinary.com/demo/video/upload/v123/ig-charity-automation/2026-09-18-1.mp4",
         "2026-09-18-2",
     )
+
+
+def test_cloudinary_url_accepts_dashboard_assignment():
+    assert _normalise_cloudinary_url(
+        "CLOUDINARY_URL=cloudinary://key:secret@cloud"
+    ) == "cloudinary://key:secret@cloud"
+
+
+def test_cloudinary_url_accepts_quoted_assignment():
+    assert _normalise_cloudinary_url(
+        "'CLOUDINARY_URL=cloudinary://key:secret@cloud'"
+    ) == "cloudinary://key:secret@cloud"
