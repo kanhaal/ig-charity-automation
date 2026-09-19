@@ -2,25 +2,23 @@ name: Publish Instagram reels
 
 on:
   schedule:
-    # Primary morning window + catch-ups.
-    - cron: '37 11 * * *'
-      timezone: 'Asia/Kolkata'
-    - cron: '17 12 * * *'
-      timezone: 'Asia/Kolkata'
-    - cron: '7 13 * * *'
-      timezone: 'Asia/Kolkata'
+    # GitHub's scheduler is driven with explicit UTC cron values here. The app
+    # itself still evaluates due slots in Asia/Kolkata. This avoids depending
+    # on timezone-aware cron behavior for the actual wake-up times.
+    #
+    # Morning target: 11:37 IST = 06:07 UTC, with catch-ups until 12:37 IST.
+    - cron: '7 6 * * *'
+    - cron: '22 6 * * *'
+    - cron: '37 6 * * *'
+    - cron: '52 6 * * *'
+    - cron: '7 7 * * *'
 
-    # Primary evening window + catch-ups.
-    - cron: '7 20 * * *'
-      timezone: 'Asia/Kolkata'
-    - cron: '47 20 * * *'
-      timezone: 'Asia/Kolkata'
-    - cron: '27 21 * * *'
-      timezone: 'Asia/Kolkata'
-    - cron: '7 22 * * *'
-      timezone: 'Asia/Kolkata'
-    - cron: '7 23 * * *'
-      timezone: 'Asia/Kolkata'
+    # Evening target: 20:07 IST = 14:37 UTC, with catch-ups until 21:07 IST.
+    - cron: '37 14 * * *'
+    - cron: '52 14 * * *'
+    - cron: '7 15 * * *'
+    - cron: '22 15 * * *'
+    - cron: '37 15 * * *'
 
   workflow_dispatch:
     inputs:
