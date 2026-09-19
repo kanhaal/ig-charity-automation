@@ -1,5 +1,14 @@
 {
-  "published": {},
-  "recent_signatures": [],
-  "last_music_id": null
+  "published": {
+    "2026-09-19-1": {
+      "buffer_post_id": "6aae342624705c90449c14f7",
+      "music_id": "melancholic_ending",
+      "signature": "h7-r1",
+      "media_url": "https://res.cloudinary.com/j9zq8bm2/video/upload/v1789801508/ig-charity-automation/2026-09-19-1.mp4"
+    }
+  },
+  "recent_signatures": [
+    "h7-r1"
+  ],
+  "last_music_id": "melancholic_ending"
 }
