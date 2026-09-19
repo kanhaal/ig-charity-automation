@@ -1,24 +1,24 @@
 name: Publish Instagram reels
 
 on:
-  schedule:
-    # GitHub's scheduler is driven with explicit UTC cron values here. The app
-    # itself still evaluates due slots in Asia/Kolkata. This avoids depending
-    # on timezone-aware cron behavior for the actual wake-up times.
-    #
-    # Morning target: 11:37 IST = 06:07 UTC, with catch-ups until 12:37 IST.
-    - cron: '7 6 * * *'
-    - cron: '22 6 * * *'
-    - cron: '37 6 * * *'
-    - cron: '52 6 * * *'
-    - cron: '7 7 * * *'
+  # Recovery trigger: changing only this file starts an immediate live due-slot
+  # run. Normal code/state pushes do NOT trigger publishing.
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/publish-now.txt'
 
-    # Evening target: 20:07 IST = 14:37 UTC, with catch-ups until 21:07 IST.
-    - cron: '37 14 * * *'
-    - cron: '52 14 * * *'
-    - cron: '7 15 * * *'
-    - cron: '22 15 * * *'
-    - cron: '37 15 * * *'
+  schedule:
+    # Primary + catch-up windows, expressed in UTC.
+    # 06:07 UTC = 11:37 IST. Every 15 minutes through 14:22 IST.
+    - cron: '7,22,37,52 6-8 * * *'
+
+    # Lightweight hourly fallbacks for a missed morning window.
+    - cron: '7 9-13 * * *'
+
+    # Evening window. 14:37 UTC = 20:07 IST. The extra pre-slot checks no-op.
+    - cron: '7,22,37,52 14-16 * * *'
 
   workflow_dispatch:
     inputs:
@@ -84,14 +84,14 @@ jobs:
           retention-days: 3
 
       - name: Generate and publish the due Reel
-        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'live-due')
+        if: github.event_name == 'schedule' || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'live-due')
         env:
           BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
           CLOUDINARY_URL: ${{ secrets.CLOUDINARY_URL }}
         run: python -m app.main
 
       - name: Persist successful publish state
-        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'live-due')
+        if: github.event_name == 'schedule' || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'live-due')
         run: |
           if git diff --quiet -- state/posted.json; then
             echo "No state change; nothing was due or publish did not complete."
